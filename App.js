@@ -228,29 +228,29 @@
     }
 
     const handlePressButton = () => {
-      // if (roomId) {
-      //   initSocket(roomId)
-      // }
-      if (!sending) {
-        subscribeSensors()
-      } else {
-        unsubscribeSensors()
+      if (roomId) {
+        initSocket(roomId)
       }
-      setSending(!sending)
+      // if (!sending) {
+      //   subscribeSensors()
+      // } else {
+      //   unsubscribeSensors()
+      // }
+      // setSending(!sending)
     }
 
     const subscribeSensors = () => {
-      subscriptions.current.accelerometer = accelerometer.subscribe(({ x, y, z, timestamp }) => {
-        const data = { x, y, z, timestamp }
-        setAccelerometerData(data)
-        const payload = {
-          target: otherUser.current,
-          data: data,
-        };
-        setSpeed(x)
-        // socketRef.current.emit("message", payload);
-        // sendChannel.current.send(JSON.stringify({accelerometer: data}))
-      })
+      // subscriptions.current.accelerometer = accelerometer.subscribe(({ x, y, z, timestamp }) => {
+      //   const data = { x, y, z, timestamp }
+      //   setAccelerometerData(data)
+      //   const payload = {
+      //     target: otherUser.current,
+      //     data: data,
+      //   };
+      //   setSpeed(x)
+      //   socketRef.current.emit("message", payload);
+      //   sendChannel.current.send(JSON.stringify({accelerometer: data}))
+      // })
       // subscriptions.current.gyroscope = gyroscope.subscribe(({ x, y, z, timestamp }) => {
       //   setGyroscopeData({ x, y, z, timestamp })
       // })
@@ -259,22 +259,23 @@
       //   setMagnetometrerData(data)
       //   // sendChannel.current.send(JSON.stringify({accelerometer: data}))
       // })
-      // subscriptions.current.orientation = orientation.subscribe(({ qx, qy, qz, qw, pitch, roll, yaw, timestamp }) => {
-      //   const converted = quaternionToAngles({ x: qx, y: qy, z: qz, w: qw, pitch, roll, yaw, timestamp })
-      //   // console.log(converted)
-      //   setOrientationData({ x: qx, y: qy, z: qz, w: qw, pitch, roll, yaw, timestamp })
-      //   const payload = {
-      //     target: otherUser.current,
-      //     data: converted,
-      //   };
-      //   // socketRef.current.emit("message", payload);
-      // })
+      subscriptions.current.orientation = orientation.subscribe(({ qx, qy, qz, qw, pitch, roll, yaw, timestamp }) => {
+        const converted = quaternionToAngles({ x: qx, y: qy, z: qz, w: qw, pitch, roll, yaw, timestamp })
+        // console.log(converted)
+        setOrientationData({ x: qx, y: qy, z: qz, w: qw, pitch, roll, yaw, timestamp })
+        // const payload = {
+        //   target: otherUser.current,
+        //   data: converted,
+        // };
+        sendChannel.current.send(JSON.stringify({orientation: converted}))
+        // socketRef.current.emit("message", payload);
+      })
     }
 
     const unsubscribeSensors = () => {
-      subscriptions.current.accelerometer.unsubscribe()
+      // subscriptions.current.accelerometer.unsubscribe()
       // subscriptions.current.gyroscope.unsubscribe()
-      // subscriptions.current.orientation.unsubscribe()
+      subscriptions.current.orientation.unsubscribe()
       // subscriptions.current.magnetometer.unsubscribe()
     }
 
