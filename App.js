@@ -7,7 +7,7 @@
    */
 
   import React, { useState, useRef, useEffect } from 'react'
-  import { SafeAreaView, StyleSheet, View, Pressable, Text, Platform, TextInput, KeyboardAvoidingView } from 'react-native'
+  import { SafeAreaView, StyleSheet, View, Pressable, Text, Platform, KeyboardAvoidingView } from 'react-native'
   import { accelerometer, gyroscope, magnetometer, orientation, setUpdateIntervalForType, SensorTypes } from 'react-native-sensors'
   import {
     RTCPeerConnection,
@@ -19,6 +19,8 @@
     getUserMedia,
   } from 'react-native-webrtc'
   import io from 'socket.io-client'
+  import QRCodeScanner from 'react-native-qrcode-scanner'
+import { RNCamera } from 'react-native-camera'
 
   const configuration = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]}
   const pcPeers = {}
@@ -49,8 +51,6 @@
     return euler;
   }
 
-  // const socket = io('192.168.1.91:9000')
-
   const App = () => {
     const subscriptions = useRef({})
     const peerRef = useRef()
@@ -61,20 +61,21 @@
     const [sending, setSending] = useState(false)
     const [roomId, setRoomId] = useState('')
     const [connected, setConnected] = useState(false)
+    const [showScanner, setShowScanner] = useState(false)
     const [accelerometerData, setAccelerometerData] = useState({x: 0, y: 0, z: 0, timestamp: 0})
     const [gyroscopeData, setGyroscopeData] = useState({x: 0, y: 0, z: 0, timestamp: 0})
-    const [orientationData, setOrientationData] = useState({x: 0, y: 0, z: 0, w: 0, pitch: 0, roll: 0, yaw: 0, timestamp: 0})
-    const [magnetometerData, setMagnetometrerData] = useState({x: 0, y: 0, z: 0, timestamp: 0})
-    const [positions, setPositions] = useState({x: 0, y: 0, z: 0})
-    const [speed, setSpeed] = useState(0)
+    const [orientationData, setOrientationData] = useState({qx: 0, qy: 0, qz: 0, qw: 0, pitch: 0, roll: 0, yaw: 0, timestamp: 0})
+    // const [magnetometerData, setMagnetometrerData] = useState({x: 0, y: 0, z: 0, timestamp: 0})
+    // const [positions, setPositions] = useState({x: 0, y: 0, z: 0})
+    // const [speed, setSpeed] = useState(0)
 
     useEffect(() => {
       socketRef.current = io.connect(
-        'http://10.0.1.9:9000',
+        'https://ws.qvady.dev',
         { transports: ['websocket'] }
       )
       socketRef.current.on('connect', () => {
-        console.log('connected')
+        console.log('connected updated')
       })
       socketRef.current.on('connect_error', error => {
         Object.keys(error).forEach(key => {
@@ -85,20 +86,20 @@
     }, [])
 
     useEffect(() => {
-      if (connected && Platform.OS === 'ios') {
+      if (connected) {
         subscribeSensors()
       } else {
-        // unsubscribeSensors()
+        unsubscribeSensors()
       }
     }, [connected, Platform.OS])
 
     const initSocket = roomID => {
       socketRef.current.emit("join room", roomID)
       socketRef.current.on("other user", userID => {
-        // callUser(userID);
+        callUser(userID)
         console.log('other user ', userID)
         otherUser.current = userID;
-        setConnected(true)
+        // setConnected(true)
       });
 
       // Signals that both peers have joined the room
@@ -171,19 +172,19 @@
         setConnected(true)
       }
 
-      const desc = new RTCSessionDescription(incoming.sdp);
+      const desc = new RTCSessionDescription(incoming.sdp)
       peerRef.current.setRemoteDescription(desc).then(() => {
       }).then(() => {
-        return peerRef.current.createAnswer();
+        return peerRef.current.createAnswer()
       }).then(answer => {
-        return peerRef.current.setLocalDescription(answer);
+        return peerRef.current.setLocalDescription(answer)
       }).then(() => {
         const payload = {
           target: incoming.caller,
           caller: socketRef.current.id,
           sdp: peerRef.current.localDescription
         }
-        socketRef.current.emit("answer", payload);
+        socketRef.current.emit("answer", payload)
       })
     }
 
@@ -197,7 +198,7 @@
     function handleReceiveMessage(e){
       // console.log("[INFO] Message received from peer", Platform.OS);
       // console.log(typeof e.data)
-      setAccelerometerData(JSON.parse(e.data))
+      // setAccelerometerData(JSON.parse(e.data))
       // const msg = [{
       //   _id: Math.random(1000).toString(),
       //   text: e.data,
@@ -240,84 +241,106 @@
     }
 
     const subscribeSensors = () => {
-      // subscriptions.current.accelerometer = accelerometer.subscribe(({ x, y, z, timestamp }) => {
-      //   const data = { x, y, z, timestamp }
-      //   setAccelerometerData(data)
-      //   const payload = {
-      //     target: otherUser.current,
-      //     data: data,
-      //   };
-      //   setSpeed(x)
-      //   socketRef.current.emit("message", payload);
-      //   sendChannel.current.send(JSON.stringify({accelerometer: data}))
-      // })
-      // subscriptions.current.gyroscope = gyroscope.subscribe(({ x, y, z, timestamp }) => {
-      //   setGyroscopeData({ x, y, z, timestamp })
-      // })
-      // subscriptions.current.magnetometer = magnetometer.subscribe(({ x, y, z, timestamp }) => {
+      subscriptions.current.accelerometer = accelerometer.subscribe((data) => {
+        setAccelerometerData(data)
+        sendChannel.current.send(JSON.stringify({accelerometer: data}))
+        // const payload = {
+        //   target: otherUser.current,
+        //   data: data,
+        // }
+        // socketRef.current.emit("message", payload);
+      })
+      subscriptions.current.gyroscope = gyroscope.subscribe((data) => {
+        setGyroscopeData(data)
+        sendChannel.current.send(JSON.stringify({gyroscope: data}))
+      })
+      subscriptions.current.orientation = orientation.subscribe((data) => {
+        // const { qx, qy, qz, qw, pitch, roll, yaw, timestamp } = data
+        setOrientationData(data)
+        sendChannel.current.send(JSON.stringify({orientation: data}))
+      })
+       // subscriptions.current.magnetometer = magnetometer.subscribe(({ x, y, z, timestamp }) => {
       //   const data = { x, y, z, timestamp }
       //   setMagnetometrerData(data)
       //   // sendChannel.current.send(JSON.stringify({accelerometer: data}))
       // })
-      subscriptions.current.orientation = orientation.subscribe(({ qx, qy, qz, qw, pitch, roll, yaw, timestamp }) => {
-        const converted = quaternionToAngles({ x: qx, y: qy, z: qz, w: qw, pitch, roll, yaw, timestamp })
-        // console.log(converted)
-        setOrientationData({ x: qx, y: qy, z: qz, w: qw, pitch, roll, yaw, timestamp })
-        // const payload = {
-        //   target: otherUser.current,
-        //   data: converted,
-        // };
-        sendChannel.current.send(JSON.stringify({orientation: converted}))
-        // socketRef.current.emit("message", payload);
-      })
     }
 
     const unsubscribeSensors = () => {
-      // subscriptions.current.accelerometer.unsubscribe()
-      // subscriptions.current.gyroscope.unsubscribe()
-      subscriptions.current.orientation.unsubscribe()
+      if (subscriptions.current.accelerometer && subscriptions.current.gyroscope && subscriptions.current.orientation) {
+        subscriptions.current.accelerometer.unsubscribe()
+        subscriptions.current.gyroscope.unsubscribe()
+        subscriptions.current.orientation.unsubscribe()
+      }
       // subscriptions.current.magnetometer.unsubscribe()
     }
 
-    const onChangeText = text => {
-      setRoomId(text)
+    const onSuccessScan = (e) => {
+      setRoomId(e.data)
+      setShowScanner(false)
+      initSocket(e.data)
+    }
+
+    const handleScanRoomId = () => {
+      setShowScanner(true)
+    }
+
+    const handleDisconnect = () => {
+      setConnected(false)
+      setRoomId('')
+      peerRef.current.close()
     }
 
     return (
       <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={[styles.container, {paddingVertical: 20, paddingHorizontal: 20}]}>
-          <View style={{width: '100%'}}>
-            <Text>Accelerometer</Text>
-            <Text>X: {accelerometerData.x.toFixed(2)}</Text>
-            <Text>Y: {accelerometerData.y.toFixed(2)}</Text>
-            <Text>Z: {accelerometerData.z.toFixed(2)}</Text>
-            <Text>Magnetometer</Text>
-            <Text>X: {magnetometerData.x.toFixed(2)}</Text>
-            <Text>Y: {magnetometerData.y.toFixed(2)}</Text>
-            <Text>Z: {magnetometerData.z.toFixed(2)}</Text>
-            <Text>Orientation</Text>
-            <Text>pitch: {orientationData.pitch.toFixed(2)}</Text>
-            <Text>roll: {orientationData.roll.toFixed(2)}</Text>
-            <Text>yaw: {orientationData.yaw.toFixed(2)}</Text>
-            <Text>X: {orientationData.x.toFixed(2)}</Text>
-            <Text>Y: {orientationData.y.toFixed(2)}</Text>
-            <Text>Z: {orientationData.z.toFixed(2)}</Text>
-            <Text>W: {orientationData.w.toFixed(2)}</Text>
-            <Text style={{textAlign: 'center', fontSize: 42, fontWeight: 'bold'}}>{speed.toFixed(2)}</Text>
-            <Text style={{textAlign: 'center', fontSize: 42, fontWeight: 'bold'}}>{accelerometerData.timestamp}</Text>
+        <View style={[styles.container, {paddingVertical: 20, paddingHorizontal: 20}]}>
+          <View style={{width: '100%', flexDirection: 'row'}}>
+            <View style={{flex: 1}}>
+              <Text style={{fontWeight: 'bold'}}>Accelerometer</Text>
+              <Text>X: {accelerometerData.x.toFixed(2)}</Text>
+              <Text>Y: {accelerometerData.y.toFixed(2)}</Text>
+              <Text>Z: {accelerometerData.z.toFixed(2)}</Text>
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={{fontWeight: 'bold'}}>Gyroscope</Text>
+              <Text>X: {gyroscopeData.x.toFixed(2)}</Text>
+              <Text>Y: {gyroscopeData.y.toFixed(2)}</Text>
+              <Text>Z: {gyroscopeData.z.toFixed(2)}</Text>
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={{fontWeight: 'bold'}}>Orientation</Text>
+              <Text>pitch: {orientationData.pitch.toFixed(2)}</Text>
+              <Text>roll: {orientationData.roll.toFixed(2)}</Text>
+              <Text>yaw: {orientationData.yaw.toFixed(2)}</Text>
+              <Text>QX: {orientationData.qx.toFixed(2)}</Text>
+              <Text>QY: {orientationData.qy.toFixed(2)}</Text>
+              <Text>QZ: {orientationData.qz.toFixed(2)}</Text>
+              <Text>QW: {orientationData.qw.toFixed(2)}</Text>
+            </View>
           </View>
-
+          {
+            showScanner
+              ? <QRCodeScanner
+                  onRead={onSuccessScan}
+                  cameraStyle={{width: '100%'}}
+                  flashMode={RNCamera.Constants.FlashMode.auto} />
+              : <Text style={{fontSize: 42, fontWeight: 'bold'}}>Room: {roomId}</Text>
+          }
           <View style={{marginTop: 'auto'}}>
-            <TextInput
-              style={styles.input}
-              onChangeText={onChangeText}
-              value={roomId} />
-            <Pressable style={styles.button} onPress={handlePressButton}>
-              <Text>{sending ? 'Stop' : 'Start'}</Text>
-            </Pressable>
+            {
+              !roomId
+                ? <Pressable style={styles.button} onPress={handleScanRoomId}>
+                    <Text>Scan QR-code</Text>
+                  </Pressable>
+                : roomId && connected
+                  ? <Pressable style={styles.button} onPress={handleDisconnect}>
+                      <Text>Disconnect</Text>
+                    </Pressable>
+                  : null
+            }
+            
           </View>
-          
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
     );
   };
