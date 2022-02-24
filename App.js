@@ -241,23 +241,23 @@ import { RNCamera } from 'react-native-camera'
     }
 
     const subscribeSensors = () => {
-      subscriptions.current.accelerometer = accelerometer.subscribe((data) => {
-        setAccelerometerData(data)
-        sendChannel.current.send(JSON.stringify({accelerometer: data}))
-        // const payload = {
-        //   target: otherUser.current,
-        //   data: data,
-        // }
-        // socketRef.current.emit("message", payload);
-      })
-      subscriptions.current.gyroscope = gyroscope.subscribe((data) => {
-        setGyroscopeData(data)
-        sendChannel.current.send(JSON.stringify({gyroscope: data}))
-      })
+      // subscriptions.current.accelerometer = accelerometer.subscribe((data) => {
+      //   setAccelerometerData(data)
+      //   sendChannel.current.send(JSON.stringify({accelerometer: data}))
+      //   // const payload = {
+      //   //   target: otherUser.current,
+      //   //   data: data,
+      //   // }
+      //   // socketRef.current.emit("message", payload);
+      // })
+      // subscriptions.current.gyroscope = gyroscope.subscribe((data) => {
+      //   setGyroscopeData(data)
+      //   sendChannel.current.send(JSON.stringify({gyroscope: data}))
+      // })
       subscriptions.current.orientation = orientation.subscribe((data) => {
-        // const { qx, qy, qz, qw, pitch, roll, yaw, timestamp } = data
+        const { qx, qy, qz, qw, pitch, roll, yaw, timestamp } = data
         setOrientationData(data)
-        sendChannel.current.send(JSON.stringify({orientation: data}))
+        sendChannel.current.send(JSON.stringify({type:"orientation", data:{x: qx, y: qy, z: qz, w: qw}}))
       })
        // subscriptions.current.magnetometer = magnetometer.subscribe(({ x, y, z, timestamp }) => {
       //   const data = { x, y, z, timestamp }
@@ -267,9 +267,9 @@ import { RNCamera } from 'react-native-camera'
     }
 
     const unsubscribeSensors = () => {
-      if (subscriptions.current.accelerometer && subscriptions.current.gyroscope && subscriptions.current.orientation) {
-        subscriptions.current.accelerometer.unsubscribe()
-        subscriptions.current.gyroscope.unsubscribe()
+      if (subscriptions.current.orientation) {
+        // subscriptions.current.accelerometer.unsubscribe()
+        // subscriptions.current.gyroscope.unsubscribe()
         subscriptions.current.orientation.unsubscribe()
       }
       // subscriptions.current.magnetometer.unsubscribe()
